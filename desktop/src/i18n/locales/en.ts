@@ -442,7 +442,7 @@ export const en = {
 
   // Settings > Adapters
   'settings.tab.adapters': 'IM Adapters',
-  'settings.adapters.description': 'Configure IM adapters to chat with Claude Code via WeChat, DingTalk, Telegram, or Feishu.',
+  'settings.adapters.description': 'Configure IM adapters to chat with AiYo via WeChat, DingTalk, Telegram, or Feishu.',
   'settings.adapters.telegram': 'Telegram',
   'settings.adapters.feishu': 'Feishu',
   'settings.adapters.wechat': 'WeChat',
@@ -921,7 +921,7 @@ export const en = {
   'settings.general.notificationsStatusUnsupported': 'Unavailable in this environment',
   'settings.general.notificationsAuthorize': 'Authorize',
   'settings.general.notificationsOpenSettings': 'Open Settings',
-  'settings.general.notificationsTestTitle': 'Claude Code Haha notifications are enabled',
+  'settings.general.notificationsTestTitle': 'AiYo notifications are enabled',
   'settings.general.notificationsTestBody': 'Permission prompts and completed agent replies will now use system notifications.',
   'settings.general.chatSendBehaviorTitle': 'Message Sending',
   'settings.general.chatSendBehaviorDescription': 'Choose how the desktop chat composer submits messages.',
