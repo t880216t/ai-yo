@@ -11,7 +11,7 @@
     "build:macos-arm64": "bash ./scripts/build-macos-arm64.sh",
     "build:windows-x64": "powershell -ExecutionPolicy Bypass -File ./scripts/build-windows-x64.ps1",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri": "tauri dev",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "lint": "node ./node_modules/typescript/bin/tsc --noEmit"
