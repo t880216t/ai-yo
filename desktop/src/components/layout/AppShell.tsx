@@ -172,7 +172,7 @@ export function AppShell() {
         listen<{ step: string; status: string; message?: string }>(
           'builtin-plugin-progress',
           (event) => {
-            const { step, status, message } = event.payload
+            const { status, message } = event.payload
             if (status === 'done' || status === 'error') {
               setPluginProgress(null)
             } else if (message) {
