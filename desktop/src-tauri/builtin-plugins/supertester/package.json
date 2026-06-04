@@ -1,8 +1,0 @@
-{
-  "name": "supertester",
-  "version": "0.8.0",
-  "description": "AI-driven software testing workflow for Claude Code - from requirements to Playwright E2E scripts",
-  "homepage": "https://github.com/supertester-ai/supertester",
-  "repository": "https://github.com/supertester-ai/supertester.git",
-  "license": "MIT"
-}
