@@ -436,7 +436,11 @@ fn seed_builtin_skills(resource_dir: Option<PathBuf>) {
 
 /// Run the sidecar in CLI mode to execute a plugin management command.
 /// Blocks synchronously until the command completes.
-fn run_sidecar_cli(app: &AppHandle, args: &[&str]) -> Result<(), String> {
+fn run_sidecar_cli(
+    app: &AppHandle,
+    app_root: &Path,
+    args: &[&str],
+) -> Result<(), String> {
     let mut sidecar = app
         .shell()
         .sidecar("claude-sidecar")
@@ -451,7 +455,11 @@ fn run_sidecar_cli(app: &AppHandle, args: &[&str]) -> Result<(), String> {
             .env("XDG_CACHE_HOME", cache_dir.to_string_lossy().to_string());
     }
 
-    let mut all_args: Vec<String> = vec!["cli".to_string()];
+    let mut all_args: Vec<String> = vec![
+        "cli".to_string(),
+        "--app-root".to_string(),
+        app_root.to_string_lossy().to_string(),
+    ];
     all_args.extend(args.iter().map(|s| s.to_string()));
     let sidecar = sidecar.args(&all_args);
 
@@ -483,7 +491,7 @@ fn run_sidecar_cli(app: &AppHandle, args: &[&str]) -> Result<(), String> {
 /// Install built-in plugins by running sidecar CLI commands.
 /// Uses the same `plugin marketplace add` + `plugin install` flow that
 /// users would run manually, so all config files are written correctly.
-fn install_builtin_plugins(app: &AppHandle) {
+fn install_builtin_plugins(app: &AppHandle, app_root: &Path) {
     let builtin: &[(&str, &str)] = &[
         ("supertester-ai/supertester", "supertester@supertester"),
     ];
@@ -492,7 +500,7 @@ fn install_builtin_plugins(app: &AppHandle) {
         println!("[desktop] installing builtin plugin: {plugin_id}");
 
         // Step 1: add marketplace (idempotent — skips if already registered)
-        match run_sidecar_cli(app, &["plugin", "marketplace", "add", repo]) {
+        match run_sidecar_cli(app, app_root, &["plugin", "marketplace", "add", repo]) {
             Ok(()) => {
                 println!("[desktop] marketplace added: {repo}");
             }
@@ -505,6 +513,7 @@ fn install_builtin_plugins(app: &AppHandle) {
         // Step 2: install plugin (idempotent — skips if already installed)
         match run_sidecar_cli(
             app,
+            app_root,
             &["plugin", "install", plugin_id, "--scope", "user"],
         ) {
             Ok(()) => {
@@ -2535,8 +2544,9 @@ pub fn run() {
 
             // 内置插件安装（后台线程，不阻塞启动）
             let app_handle = app.handle().clone();
+            let app_root = resolve_app_root(&app_handle).unwrap_or_else(|_| PathBuf::from("."));
             std::thread::spawn(move || {
-                install_builtin_plugins(&app_handle);
+                install_builtin_plugins(&app_handle, &app_root);
             });
 
             setup_system_tray(app)?;

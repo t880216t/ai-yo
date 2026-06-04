@@ -3594,7 +3594,7 @@ function AboutSettings() {
       )}
 
       {/* GitHub Repo */}
-      <div className="mt-6 w-full">
+      {/* <div className="mt-6 w-full">
         <button
           onClick={() => openUrl(GITHUB_REPO)}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer"
@@ -3605,7 +3605,7 @@ function AboutSettings() {
             <div className="text-xs text-[var(--color-text-tertiary)]">{t('settings.about.starHint')}</div>
           </div>
         </button>
-      </div>
+      </div> */}
 
       <div className="mt-4 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] p-4">
         <div className="flex items-start justify-between gap-3">

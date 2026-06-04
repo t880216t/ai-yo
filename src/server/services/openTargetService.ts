@@ -175,6 +175,38 @@ const TARGET_DEFINITIONS: TargetDefinition[] = [
     },
   },
   {
+    id: 'intellij-idea',
+    kind: 'ide',
+    label: 'IntelliJ IDEA',
+    icon: 'intellij',
+    platforms: ['darwin', 'win32', 'linux'],
+    commands: {
+      darwin: ['idea'],
+      win32: ['idea64.exe', 'idea.cmd'],
+      linux: ['idea'],
+    },
+    windowsExecutableNames: ['idea64.exe', 'idea.exe'],
+    appPaths: {
+      darwin: ['/Applications/IntelliJ IDEA.app', posixPath.join(homedir(), 'Applications', 'IntelliJ IDEA.app')],
+    },
+  },
+  {
+    id: 'trae-cn',
+    kind: 'ide',
+    label: 'Trae CN',
+    icon: 'trae',
+    platforms: ['darwin', 'win32', 'linux'],
+    commands: {
+      darwin: ['trae-cn'],
+      win32: ['trae-cn.cmd', 'trae-cn.exe'],
+      linux: ['trae-cn'],
+    },
+    windowsExecutableNames: ['Trae CN.exe'],
+    appPaths: {
+      darwin: ['/Applications/Trae CN.app', posixPath.join(homedir(), 'Applications', 'Trae CN.app')],
+    },
+  },
+  {
     id: 'finder',
     kind: 'file_manager',
     label: 'Finder',
