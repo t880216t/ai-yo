@@ -3389,7 +3389,11 @@ function DetailStat({
 
 function SkillSettings() {
   const selectedSkill = useSkillStore((s) => s.selectedSkill)
+  const appMode = useSettingsStore((s) => s.appMode)
   const t = useTranslation()
+
+  const activeConfigDir = appMode.activeConfigDir ?? (appMode.mode === 'portable' ? appMode.portableDir : null)
+  const skillsPath = activeConfigDir ? `${activeConfigDir}/skills/` : '~/.claude/skills/'
 
   if (selectedSkill) {
     return (
@@ -3405,7 +3409,7 @@ function SkillSettings() {
         {t('settings.skills.title')}
       </h2>
       <p className="text-sm text-[var(--color-text-tertiary)] mb-4">
-        {t('settings.skills.description')}
+        {t('settings.skills.description', { path: skillsPath })}
       </p>
       <SkillList />
     </div>

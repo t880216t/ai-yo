@@ -514,24 +514,50 @@ fn run_sidecar_cli(
 /// Install built-in plugins by running sidecar CLI commands synchronously.
 /// Called before the server sidecar starts so plugins are available immediately.
 fn install_builtin_plugins(app: &AppHandle, app_root: &Path) {
-    let builtin: &[(&str, &str)] = &[
-        ("supertester-ai/supertester", "supertester@supertester"),
+    // Phase 1: Register all required marketplaces (deduplicated).
+    let marketplaces: &[&str] = &[
+        "supertester-ai/supertester",
+        "claude-office-skills/skills",
+        "anthropics/claude-plugins-official",
     ];
 
-    for (repo, plugin_id) in builtin {
+    for repo in marketplaces {
         let step = format!("marketplace: {repo}");
-
         match run_sidecar_cli(app, app_root, &step, &["plugin", "marketplace", "add", repo]) {
             Ok(()) => {
                 println!("[desktop] marketplace added: {repo}");
             }
             Err(e) => {
                 eprintln!("[desktop] failed to add marketplace {repo}: {e}");
-                continue;
             }
         }
+    }
 
-        let step = format!("install: {plugin_id}");
+    // Phase 2: Install each built-in plugin.
+    // Format: (plugin_id, display_name)
+    let builtin: &[(&str, &str)] = &[
+        // supertester
+        ("supertester@supertester", "supertester"),
+        // claude-office-skills
+        ("office-documents@claude-office-skills", "office-documents"),
+        ("legal-cn@claude-office-skills", "legal-cn"),
+        // claude-plugins-official
+        ("superpowers@claude-plugins-official", "superpowers"),
+        ("context7@claude-plugins-official", "context7"),
+        ("github@claude-plugins-official", "github"),
+        ("frontend-design@claude-plugins-official", "frontend-design"),
+        ("supabase@claude-plugins-official", "supabase"),
+        ("code-review@claude-plugins-official", "code-review"),
+        ("commit-commands@claude-plugins-official", "commit-commands"),
+        ("skill-creator@claude-plugins-official", "skill-creator"),
+        ("playwright@claude-plugins-official", "playwright"),
+        ("typescript-lsp@claude-plugins-official", "typescript-lsp"),
+        ("jdtls-lsp@claude-plugins-official", "jdtls-lsp"),
+        ("pyright-lsp@claude-plugins-official", "pyright-lsp"),
+    ];
+
+    for (plugin_id, display_name) in builtin {
+        let step = format!("install: {display_name}");
         match run_sidecar_cli(
             app,
             app_root,
