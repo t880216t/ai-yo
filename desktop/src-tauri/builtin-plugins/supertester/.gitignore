@@ -1,0 +1,22 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
+
+# Local Claude state
+.claude/
+
+# Auto-iterate (evaluation tool, not part of core plugin)
+/scripts/auto-iterate/*
+
+# Verification workspace (per-run output, not part of repo)
+/verification/

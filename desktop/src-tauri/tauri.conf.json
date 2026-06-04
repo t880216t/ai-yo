@@ -51,7 +51,9 @@
       "binaries/claude-sidecar"
     ],
     "resources": [
-      "../dist"
+      "../dist",
+      "builtin-skills",
+      "builtin-plugins"
     ],
     "icon": [
       "icons/32x32.png",

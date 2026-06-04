@@ -136,5 +136,6 @@ fn determine_startup_portable_dir() -> Option<PathBuf> {
         return Some(default_portable);
     }
 
-    None
+    // 默认使用便携模式
+    Some(default_portable)
 }

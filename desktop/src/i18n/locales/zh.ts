@@ -681,7 +681,7 @@ export const zh: Record<TranslationKey, string> = {
   'settings.skills.ready': '可查看',
   'settings.skills.unavailable': '不可用',
   'settings.skills.empty': '暂无已安装技能',
-  'settings.skills.emptyHint': '在 ~/.claude/skills/ 中添加技能即可开始',
+  'settings.skills.emptyHint': '在安装目录 builtin-skills/ 中添加 SKILL.md 文件即可内置技能',
   'settings.skills.back': '返回列表',
   'settings.skills.files': '个文件',
   'settings.skills.entryFile': '入口文件',

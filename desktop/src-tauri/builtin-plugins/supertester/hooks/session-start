@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# SessionStart hook for supertester plugin
+# Injects using-supertester skill + recovers session context from .supertester/
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Self-healing: fix executable permissions lost during zip extraction
+chmod +x "${SCRIPT_DIR}/post-tool-use" \
+         "${SCRIPT_DIR}/session-start" "${SCRIPT_DIR}/stop" "${SCRIPT_DIR}/user-prompt-submit" 2>/dev/null || true
+
+# Escape string for JSON embedding
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+# Read using-supertester skill content
+using_supertester_content=$(cat "${PLUGIN_ROOT}/skills/using-supertester/SKILL.md" 2>&1 || echo "Error reading using-supertester skill")
+using_supertester_escaped=$(escape_for_json "$using_supertester_content")
+
+# Check for existing .supertester/ session and build recovery context
+recovery_context=""
+if [ -f ".supertester/test_plan.md" ]; then
+    # Read first 50 lines of test_plan.md for phase status
+    plan_head=$(head -50 ".supertester/test_plan.md" 2>/dev/null || echo "")
+    plan_escaped=$(escape_for_json "$plan_head")
+
+    # Read last 30 lines of progress.md for recent activity
+    progress_tail=""
+    if [ -f ".supertester/progress.md" ]; then
+        progress_tail=$(tail -30 ".supertester/progress.md" 2>/dev/null || echo "")
+    fi
+    progress_escaped=$(escape_for_json "$progress_tail")
+
+    recovery_context="\\n\\n<SESSION-RECOVERY>\\nDetected existing .supertester/ session.\\n\\ntest_plan.md (first 50 lines):\\n${plan_escaped}\\n\\nprogress.md (last 30 lines):\\n${progress_escaped}\\n\\nResume from where you left off. Read test_plan.md to determine current phase.\\n</SESSION-RECOVERY>"
+fi
+
+session_context="<EXTREMELY_IMPORTANT>\\nYou have supertester powers.\\n\\n**Below is the full content of your 'supertester:using-supertester' skill - your testing workflow guide. For all other skills, use the 'Skill' tool:**\\n\\n${using_supertester_escaped}${recovery_context}\\n</EXTREMELY_IMPORTANT>"
+
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$session_context"
+
+exit 0

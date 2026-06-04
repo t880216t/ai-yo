@@ -317,6 +317,428 @@ fn get_default_portable_dir() -> Option<PathBuf> {
     Some(dir)
 }
 
+/// Recursively copy a directory and its contents.
+fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
+/// Resolve the target skills directory based on the current config mode.
+fn resolve_skills_target_dir() -> Option<PathBuf> {
+    if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
+        return Some(PathBuf::from(&config_dir).join("skills"));
+    }
+    // System mode fallback: ~/.claude/skills
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .ok()?;
+    Some(PathBuf::from(home).join(".claude").join("skills"))
+}
+
+/// Seed built-in skills from the bundled resources or exe directory into the
+/// skills directory.  Checks `resource_dir/builtin-skills` first (packaged),
+/// then `<exe_dir>/builtin-skills` (manual placement).
+/// Idempotent: each skill is copied only if its target SKILL.md does not already exist.
+fn seed_builtin_skills(resource_dir: Option<PathBuf>) {
+    // Search for builtin-skills in resource dir (packaged) then exe dir (manual)
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(ref rd) = resource_dir {
+        candidates.push(rd.join("builtin-skills"));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            candidates.push(exe_dir.join("builtin-skills"));
+        }
+    }
+
+    let builtin_skills_dir = match candidates.iter().find(|d| d.is_dir()) {
+        Some(dir) => {
+            eprintln!("[desktop] seed_builtin_skills: found dir at {:?}", dir);
+            dir.clone()
+        }
+        None => {
+            eprintln!("[desktop] seed_builtin_skills: no builtin-skills found in candidates {:?}", candidates);
+            return;
+        }
+    };
+
+    let skills_target = match resolve_skills_target_dir() {
+        Some(dir) => dir,
+        None => {
+            eprintln!("[desktop] cannot determine skills target directory for seeding");
+            return;
+        }
+    };
+
+    if let Err(e) = fs::create_dir_all(&skills_target) {
+        eprintln!(
+            "[desktop] failed to create skills directory {}: {e}",
+            skills_target.display()
+        );
+        return;
+    }
+
+    let entries = match fs::read_dir(&builtin_skills_dir) {
+        Ok(entries) => entries,
+        Err(e) => {
+            eprintln!("[desktop] failed to read builtin-skills directory: {e}");
+            return;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let file_type = match entry.file_type() {
+            Ok(ft) => ft,
+            Err(_) => continue,
+        };
+        if !file_type.is_dir() {
+            continue;
+        }
+
+        let skill_name = entry.file_name();
+        let source_skill_md = entry.path().join("SKILL.md");
+        if !source_skill_md.is_file() {
+            continue;
+        }
+
+        let target_skill_dir = skills_target.join(&skill_name);
+
+        // Idempotent: skip if already exists
+        if target_skill_dir.join("SKILL.md").exists() {
+            continue;
+        }
+
+        if let Err(e) = copy_dir_recursive(&entry.path(), &target_skill_dir) {
+            eprintln!(
+                "[desktop] failed to seed skill {}: {e}",
+                skill_name.to_string_lossy()
+            );
+            continue;
+        }
+
+        println!(
+            "[desktop] seeded builtin skill: {}",
+            skill_name.to_string_lossy()
+        );
+    }
+}
+
+/// Resolve the target plugins directory based on the current config mode.
+fn resolve_plugins_target_dir() -> Option<PathBuf> {
+    if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
+        return Some(PathBuf::from(&config_dir).join("plugins"));
+    }
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .ok()?;
+    Some(PathBuf::from(home).join(".claude").join("plugins"))
+}
+
+/// Update known_marketplaces.json to register a marketplace entry.
+/// Creates the file if it doesn't exist; skips if the entry already exists.
+fn register_marketplace(plugins_root: &Path, name: &str, install_location: &Path) {
+    let config_file = plugins_root.join("known_marketplaces.json");
+
+    let mut config: serde_json::Value = match fs::read_to_string(&config_file) {
+        Ok(content) => {
+            serde_json::from_str(&content).unwrap_or(serde_json::Value::Object(Default::default()))
+        }
+        Err(_) => serde_json::Value::Object(Default::default()),
+    };
+
+    if config.get(name).is_some() {
+        eprintln!("[desktop] marketplace '{}' already registered, skipping", name);
+        return;
+    }
+
+    config[name] = serde_json::json!({
+        "source": { "source": "directory", "path": "." },
+        "installLocation": install_location.to_string_lossy(),
+        "lastUpdated": "2025-01-01T00:00:00.000Z",
+        "autoUpdate": false
+    });
+
+    match serde_json::to_string_pretty(&config) {
+        Ok(content) => {
+            if let Err(e) = fs::write(&config_file, &content) {
+                eprintln!("[desktop] failed to write {}: {e}", config_file.display());
+            } else {
+                println!("[desktop] registered marketplace '{}'", name);
+            }
+        }
+        Err(e) => {
+            eprintln!("[desktop] failed to serialize known_marketplaces.json: {e}");
+        }
+    }
+}
+
+/// Seed built-in plugins by copying marketplace directories from
+/// builtin-plugins/marketplaces/ directly into the config plugins directory.
+/// This bypasses the seed-cache mechanism and ensures plugins are available
+/// immediately on first launch.
+fn seed_builtin_plugins(resource_dir: Option<PathBuf>) {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(ref rd) = resource_dir {
+        candidates.push(rd.join("builtin-plugins"));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            candidates.push(exe_dir.join("builtin-plugins"));
+        }
+    }
+
+    let builtin_plugins_dir = match candidates.iter().find(|d| d.is_dir()) {
+        Some(dir) => dir.clone(),
+        None => {
+            eprintln!("[desktop] seed_builtin_plugins: no builtin-plugins found");
+            return;
+        }
+    };
+
+    let plugins_target = match resolve_plugins_target_dir() {
+        Some(dir) => dir,
+        None => {
+            eprintln!("[desktop] seed_builtin_plugins: cannot determine plugins target dir");
+            return;
+        }
+    };
+
+    let marketplaces_target = plugins_target.join("marketplaces");
+    if let Err(e) = fs::create_dir_all(&marketplaces_target) {
+        eprintln!("[desktop] failed to create {}: {e}", marketplaces_target.display());
+        return;
+    }
+
+    let entries = match fs::read_dir(&builtin_plugins_dir) {
+        Ok(entries) => entries,
+        Err(e) => {
+            eprintln!("[desktop] failed to read {}: {e}", builtin_plugins_dir.display());
+            return;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let file_type = match entry.file_type() {
+            Ok(ft) => ft,
+            Err(_) => continue,
+        };
+        if !file_type.is_dir() {
+            continue;
+        }
+
+        let marketplace_name = entry.file_name();
+
+        // Each subdirectory is a standalone marketplace (marketplace = plugin root).
+        // Must contain .claude-plugin/marketplace.json (like git-installed marketplaces).
+        if !entry.path().join(".claude-plugin").join("marketplace.json").exists() {
+            continue;
+        }
+
+        let target_dir = marketplaces_target.join(&marketplace_name);
+
+        // Idempotent: skip if already exists
+        if target_dir.join(".claude-plugin").join("marketplace.json").exists() {
+            eprintln!(
+                "[desktop] marketplace '{}' already exists, skipping",
+                marketplace_name.to_string_lossy()
+            );
+            continue;
+        }
+
+        if let Err(e) = copy_dir_recursive(&entry.path(), &target_dir) {
+            eprintln!(
+                "[desktop] failed to seed marketplace '{}': {e}",
+                marketplace_name.to_string_lossy()
+            );
+            continue;
+        }
+
+        println!(
+            "[desktop] seeded marketplace '{}' to {}",
+            marketplace_name.to_string_lossy(),
+            target_dir.display()
+        );
+
+        // Register in known_marketplaces.json
+        register_marketplace(&plugins_target, &marketplace_name.to_string_lossy(), &target_dir);
+
+        // Also install the plugin: copy to cache + register in installed_plugins.json
+        install_builtin_plugin(
+            &plugins_target,
+            &marketplace_name.to_string_lossy(),
+            &entry.path(),
+        );
+    }
+}
+
+/// Read the plugin version from .claude-plugin/plugin.json
+fn read_plugin_version(plugin_dir: &Path) -> String {
+    let manifest_path = plugin_dir.join(".claude-plugin").join("plugin.json");
+    match fs::read_to_string(&manifest_path) {
+        Ok(content) => {
+            match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(json) => json
+                    .get("version")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("1.0.0")
+                    .to_string(),
+                Err(_) => "1.0.0".to_string(),
+            }
+        }
+        Err(_) => "1.0.0".to_string(),
+    }
+}
+
+/// Copy a builtin plugin to the versioned cache and register it in
+/// installed_plugins.json so it is loaded immediately.
+fn install_builtin_plugin(plugins_root: &Path, marketplace_name: &str, plugin_dir: &Path) {
+    let version = read_plugin_version(plugin_dir);
+    let plugin_name = marketplace_name; // marketplace = plugin for builtin plugins
+
+    // Cache path: <plugins>/cache/<marketplace>/<plugin>/<version>/
+    let cache_target = plugins_root
+        .join("cache")
+        .join(marketplace_name)
+        .join(plugin_name)
+        .join(&version);
+
+    if cache_target.join(".claude-plugin").join("plugin.json").exists() {
+        eprintln!(
+            "[desktop] plugin '{}/{}' v{} already cached, skipping",
+            marketplace_name, plugin_name, version
+        );
+        return;
+    }
+
+    if let Err(e) = copy_dir_recursive(plugin_dir, &cache_target) {
+        eprintln!(
+            "[desktop] failed to cache plugin '{}/{}': {e}",
+            marketplace_name, plugin_name
+        );
+        return;
+    }
+
+    println!(
+        "[desktop] cached plugin '{}/{}' v{} to {}",
+        marketplace_name,
+        plugin_name,
+        version,
+        cache_target.display()
+    );
+
+    // Register in installed_plugins.json
+    let installed_file = plugins_root.join("installed_plugins.json");
+    let installed_key = format!("{plugin_name}@{marketplace_name}");
+
+    let mut config: serde_json::Value = match fs::read_to_string(&installed_file) {
+        Ok(content) => {
+            serde_json::from_str(&content).unwrap_or(serde_json::Value::Object(Default::default()))
+        }
+        Err(_) => serde_json::json!({ "version": 2, "plugins": {} }),
+    };
+
+    // Ensure the structure is correct
+    if config.get("version").is_none() {
+        config["version"] = serde_json::json!(2);
+    }
+    if config.get("plugins").is_none() {
+        config["plugins"] = serde_json::json!({});
+    }
+
+    // Check if already installed
+    if let Some(existing) = config["plugins"].get(&installed_key) {
+        // Already has entries for this plugin — skip
+        if existing.as_array().map(|a| a.len()).unwrap_or(0) > 0 {
+            eprintln!(
+                "[desktop] plugin '{}' already in installed_plugins.json, skipping",
+                installed_key
+            );
+            return;
+        }
+    }
+
+    let entry = serde_json::json!([{
+        "scope": "user",
+        "installPath": cache_target.to_string_lossy(),
+        "version": version,
+        "installedAt": "2025-01-01T00:00:00.000Z",
+        "lastUpdated": "2025-01-01T00:00:00.000Z",
+    }]);
+
+    config["plugins"][&installed_key] = entry;
+
+    match serde_json::to_string_pretty(&config) {
+        Ok(content) => {
+            if let Err(e) = fs::write(&installed_file, &content) {
+                eprintln!("[desktop] failed to write {}: {e}", installed_file.display());
+            } else {
+                println!("[desktop] registered plugin '{}' in installed_plugins.json", installed_key);
+            }
+        }
+        Err(e) => {
+            eprintln!("[desktop] failed to serialize installed_plugins.json: {e}");
+        }
+    }
+
+    // Also enable the plugin in settings.json so it loads by default
+    enable_plugin_in_settings(&installed_key);
+}
+
+/// Add a plugin to enabledPlugins in settings.json so it is active by default.
+fn enable_plugin_in_settings(plugin_key: &str) {
+    let settings_path = if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
+        PathBuf::from(&config_dir).join("settings.json")
+    } else if let Ok(home) = std::env::var("USERPROFILE") {
+        PathBuf::from(&home).join(".claude").join("settings.json")
+    } else {
+        eprintln!("[desktop] cannot determine settings.json path");
+        return;
+    };
+
+    let mut settings: serde_json::Value = match fs::read_to_string(&settings_path) {
+        Ok(content) => {
+            serde_json::from_str(&content).unwrap_or(serde_json::Value::Object(Default::default()))
+        }
+        Err(_) => serde_json::Value::Object(Default::default()),
+    };
+
+    // Ensure enabledPlugins exists
+    if settings.get("enabledPlugins").is_none() {
+        settings["enabledPlugins"] = serde_json::json!({});
+    }
+
+    if settings["enabledPlugins"].get(plugin_key).is_some() {
+        eprintln!("[desktop] plugin '{}' already enabled in settings", plugin_key);
+        return;
+    }
+
+    settings["enabledPlugins"][plugin_key] = serde_json::json!(true);
+
+    match serde_json::to_string_pretty(&settings) {
+        Ok(content) => {
+            if let Err(e) = fs::write(&settings_path, &content) {
+                eprintln!("[desktop] failed to write {}: {e}", settings_path.display());
+            } else {
+                println!("[desktop] enabled plugin '{}' in settings.json", plugin_key);
+            }
+        }
+        Err(e) => {
+            eprintln!("[desktop] failed to serialize settings.json: {e}");
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct TerminalConfig {
     #[serde(default)]
@@ -1607,10 +2029,18 @@ fn start_server_sidecar(app: &AppHandle) -> Result<ServerRuntime, String> {
             .env("XDG_CACHE_HOME", cache_dir.to_string_lossy().to_string())
             .env("CLAUDE_H5_AUTO_PUBLIC_URL", "1")
             .env("CLAUDE_H5_DIST_DIR", h5_dist_dir);
+        // Pass through plugin seed dir for built-in plugins
+        if let Ok(seed_dir) = std::env::var("CLAUDE_CODE_PLUGIN_SEED_DIR") {
+            sidecar = sidecar.env("CLAUDE_CODE_PLUGIN_SEED_DIR", &seed_dir);
+        }
     } else {
         sidecar = sidecar
             .env("CLAUDE_H5_AUTO_PUBLIC_URL", "1")
             .env("CLAUDE_H5_DIST_DIR", h5_dist_dir);
+        // Pass through plugin seed dir for built-in plugins
+        if let Ok(seed_dir) = std::env::var("CLAUDE_CODE_PLUGIN_SEED_DIR") {
+            sidecar = sidecar.env("CLAUDE_CODE_PLUGIN_SEED_DIR", &seed_dir);
+        }
     }
     let sidecar = sidecar.args([
         "server",
@@ -2321,6 +2751,21 @@ pub fn run() {
 
     let app = builder
         .setup(|app| {
+            // 诊断日志
+            let resource_dir = app.path().resource_dir().ok();
+            eprintln!(
+                "[desktop] setup diagnostics: resource_dir={:?}, CLAUDE_CONFIG_DIR={:?}, CC_HAHA_APP_PORTABLE_DIR={:?}",
+                resource_dir,
+                std::env::var("CLAUDE_CONFIG_DIR").ok(),
+                std::env::var("CC_HAHA_APP_PORTABLE_DIR").ok(),
+            );
+
+            // 播种内置技能
+            seed_builtin_skills(resource_dir.clone());
+
+            // 播种内置插件——直接复制 marketplace 到配置目录
+            seed_builtin_plugins(resource_dir);
+
             setup_system_tray(app)?;
             macos_notifications::install_click_handler(app.handle().clone());
             restore_main_window_state(&app.handle());

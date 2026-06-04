@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Supertester">
+  <rect width="128" height="128" rx="24" fill="#0F766E"/>
+  <path d="M31 38h66v12H31zM31 58h42v12H31zM31 78h34v12H31z" fill="#ECFDF5"/>
+  <path d="M86 54l11 11-24 24-15 4 4-15 24-24z" fill="#A7F3D0"/>
+  <path d="M84 57l11 11" stroke="#064E3B" stroke-width="6" stroke-linecap="round"/>
+</svg>

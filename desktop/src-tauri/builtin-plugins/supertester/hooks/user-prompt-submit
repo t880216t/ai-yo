@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# UserPromptSubmit hook for supertester plugin
+# Injects current phase context from test_plan.md on every user message
+
+set -euo pipefail
+
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+context=""
+
+# Only inject if .supertester/ session exists
+if [ -f ".supertester/test_plan.md" ]; then
+    # Extract current phase
+    current_phase=$(grep -m1 "^## Current Phase" -A1 ".supertester/test_plan.md" 2>/dev/null | tail -1 || echo "Unknown")
+
+    # Extract current phase's Iron Law reminder based on phase number
+    phase_num=$(echo "$current_phase" | grep -oE '[0-9]+' | head -1 || echo "0")
+
+    iron_law=""
+    case "$phase_num" in
+        1) iron_law="Iron Law: Do not generate any tests without understanding the requirements." ;;
+        2) iron_law="Iron Law: Do not generate test cases without analyzing module associations." ;;
+        3) iron_law="Iron Law: Select generators by requirement characteristics; do not blindly invoke all." ;;
+        4) iron_law="Iron Law: Do not analyze automation feasibility for unconfirmed test cases." ;;
+        5) iron_law="Iron Law: Only generate scripts for confirmed cases marked as automatable/partial." ;;
+        6) iron_law="" ;;
+        *) iron_law="" ;;
+    esac
+
+    reminder="<PHASE-CONTEXT>\\nCurrent: ${current_phase}\\n${iron_law}\\nRemember: Check test_plan.md before major decisions. Follow 2-Action Rule.\\n</PHASE-CONTEXT>"
+    context=$(escape_for_json "$reminder")
+fi
+
+# Output empty context if no session
+if [ -z "$context" ]; then
+    context=""
+fi
+
+printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "UserPromptSubmit",\n    "additionalContext": "%s"\n  }\n}\n' "$context"
+
+exit 0

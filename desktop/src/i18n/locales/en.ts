@@ -679,7 +679,7 @@ export const en = {
   'settings.skills.ready': 'Ready',
   'settings.skills.unavailable': 'Unavailable',
   'settings.skills.empty': 'No skills installed',
-  'settings.skills.emptyHint': 'Add skills to ~/.claude/skills/ to get started',
+  'settings.skills.emptyHint': 'Add skill directories to builtin-skills/ next to the app to ship built-in skills',
   'settings.skills.back': 'Back to list',
   'settings.skills.files': 'files',
   'settings.skills.entryFile': 'entry file',
