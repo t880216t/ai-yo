@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type HTMLAttributes } from 'react'
+import { useCallback, useEffect, useRef, useState, type HTMLAttributes } from 'react'
 import { Sidebar } from './Sidebar'
 import { ContentRouter } from './ContentRouter'
 import { ToastContainer } from '../shared/Toast'
@@ -20,6 +20,7 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { useTranslation } from '../../i18n'
 import { H5ConnectionView } from './H5ConnectionView'
 import { useMobileViewport } from '../../hooks/useMobileViewport'
+import { usePluginStore } from '../../stores/pluginStore'
 import type { Tab } from '../../stores/tabStore'
 
 function isChatTab(tab: Tab | undefined) {
@@ -154,6 +155,42 @@ export function AppShell() {
     useTabStore.setState({ activeTabId: null })
   }, [activeTab, activeTabId, isMobileShell, ready, setActiveTab, tabs])
 
+  // Built-in plugin install progress (from Rust backend)
+  const [pluginProgress, setPluginProgress] = useState<string | null>(null)
+  const reloadPlugins = usePluginStore((s) => s.reloadPlugins)
+
+  const handlePluginReload = useCallback(() => {
+    reloadPlugins(undefined, undefined).catch(() => {})
+  }, [reloadPlugins])
+
+  useEffect(() => {
+    if (!tauriRuntime) return
+    let unlistenProgress: (() => void) | undefined
+    let unlistenReady: (() => void) | undefined
+    import('@tauri-apps/api/event')
+      .then(({ listen }) => {
+        listen<{ step: string; status: string; message?: string }>(
+          'builtin-plugin-progress',
+          (event) => {
+            const { step, status, message } = event.payload
+            if (status === 'done' || status === 'error') {
+              setPluginProgress(null)
+            } else if (message) {
+              setPluginProgress(message)
+            }
+          },
+        ).then((fn) => { unlistenProgress = fn })
+        listen('builtin-plugins-ready', () => {
+          handlePluginReload()
+        }).then((fn) => { unlistenReady = fn })
+      })
+      .catch(() => {})
+    return () => {
+      unlistenProgress?.()
+      unlistenReady?.()
+    }
+  }, [tauriRuntime, handlePluginReload])
+
   const setEffectiveSidebarOpen = (open: boolean) => {
     if (isMobileShell) {
       setMobileSidebarOpen(open)
@@ -187,8 +224,13 @@ export function AppShell() {
 
   if (!ready) {
     return (
-      <div className="app-shell-viewport flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-text-secondary)]">
-        {t('app.launching')}
+      <div className="app-shell-viewport flex flex-col items-center justify-center gap-2 bg-[var(--color-surface)] text-[var(--color-text-secondary)]">
+        <span>{t('app.launching')}</span>
+        {pluginProgress ? (
+          <span className="text-xs text-[var(--color-text-tertiary)] animate-pulse">
+            {pluginProgress}
+          </span>
+        ) : null}
       </div>
     )
   }

@@ -436,18 +436,24 @@ fn seed_builtin_skills(resource_dir: Option<PathBuf>) {
 
 /// Run the sidecar in CLI mode to execute a plugin management command.
 /// Blocks synchronously until the command completes.
+/// Emits progress events to the frontend via `app.emit()`.
 fn run_sidecar_cli(
     app: &AppHandle,
     app_root: &Path,
+    step: &str,
     args: &[&str],
 ) -> Result<(), String> {
+    // Notify frontend about current step
+    let _ = app.emit("builtin-plugin-progress", serde_json::json!({
+        "step": step,
+        "status": "running",
+    }));
+
     let mut sidecar = app
         .shell()
         .sidecar("claude-sidecar")
         .map_err(|err| format!("resolve sidecar: {err}"))?;
 
-    // Pass through CLAUDE_CONFIG_DIR + XDG_CACHE_HOME so the CLI uses the
-    // same config directory as the server.
     if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
         let cache_dir = PathBuf::from(&config_dir).join("Cache");
         sidecar = sidecar
@@ -470,15 +476,32 @@ fn run_sidecar_cli(
     while let Some(event) = rx.blocking_recv() {
         match event {
             CommandEvent::Stdout(line) => {
-                println!("[cli] {}", String::from_utf8_lossy(&line).trim_end());
+                let text = String::from_utf8_lossy(&line).trim_end().to_string();
+                println!("[cli] {text}");
+                let _ = app.emit("builtin-plugin-progress", serde_json::json!({
+                    "step": step,
+                    "status": "running",
+                    "message": text,
+                }));
             }
             CommandEvent::Stderr(line) => {
-                eprintln!("[cli] {}", String::from_utf8_lossy(&line).trim_end());
+                let text = String::from_utf8_lossy(&line).trim_end().to_string();
+                eprintln!("[cli] {text}");
             }
             CommandEvent::Terminated(payload) => {
                 if payload.code != Some(0) {
-                    return Err(format!("exit code {:?}", payload.code));
+                    let msg = format!("exit code {:?}", payload.code);
+                    let _ = app.emit("builtin-plugin-progress", serde_json::json!({
+                        "step": step,
+                        "status": "error",
+                        "message": msg,
+                    }));
+                    return Err(msg);
                 }
+                let _ = app.emit("builtin-plugin-progress", serde_json::json!({
+                    "step": step,
+                    "status": "done",
+                }));
                 return Ok(());
             }
             _ => {}
@@ -488,19 +511,17 @@ fn run_sidecar_cli(
     Err("cli process exited without terminated event".to_string())
 }
 
-/// Install built-in plugins by running sidecar CLI commands.
-/// Uses the same `plugin marketplace add` + `plugin install` flow that
-/// users would run manually, so all config files are written correctly.
+/// Install built-in plugins by running sidecar CLI commands synchronously.
+/// Called before the server sidecar starts so plugins are available immediately.
 fn install_builtin_plugins(app: &AppHandle, app_root: &Path) {
     let builtin: &[(&str, &str)] = &[
         ("supertester-ai/supertester", "supertester@supertester"),
     ];
 
     for (repo, plugin_id) in builtin {
-        println!("[desktop] installing builtin plugin: {plugin_id}");
+        let step = format!("marketplace: {repo}");
 
-        // Step 1: add marketplace (idempotent — skips if already registered)
-        match run_sidecar_cli(app, app_root, &["plugin", "marketplace", "add", repo]) {
+        match run_sidecar_cli(app, app_root, &step, &["plugin", "marketplace", "add", repo]) {
             Ok(()) => {
                 println!("[desktop] marketplace added: {repo}");
             }
@@ -510,10 +531,11 @@ fn install_builtin_plugins(app: &AppHandle, app_root: &Path) {
             }
         }
 
-        // Step 2: install plugin (idempotent — skips if already installed)
+        let step = format!("install: {plugin_id}");
         match run_sidecar_cli(
             app,
             app_root,
+            &step,
             &["plugin", "install", plugin_id, "--scope", "user"],
         ) {
             Ok(()) => {
@@ -524,6 +546,11 @@ fn install_builtin_plugins(app: &AppHandle, app_root: &Path) {
             }
         }
     }
+
+    let _ = app.emit("builtin-plugin-progress", serde_json::json!({
+        "step": "done",
+        "status": "done",
+    }));
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2542,11 +2569,13 @@ pub fn run() {
             // 播种内置技能
             seed_builtin_skills(resource_dir.clone());
 
-            // 内置插件安装（后台线程，不阻塞启动）
+            // 内置插件安装（后台线程，完成后自动触发前端刷新）
             let app_handle = app.handle().clone();
             let app_root = resolve_app_root(&app_handle).unwrap_or_else(|_| PathBuf::from("."));
             std::thread::spawn(move || {
                 install_builtin_plugins(&app_handle, &app_root);
+                // 通知前端插件安装完成，触发刷新
+                let _ = app_handle.emit("builtin-plugins-ready", serde_json::json!({}));
             });
 
             setup_system_tray(app)?;
