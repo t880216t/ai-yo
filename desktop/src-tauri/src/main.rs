@@ -23,6 +23,11 @@ fn main() {
             portable_dir.to_string_lossy().to_string(),
         );
         std::env::set_var("CC_HAHA_APP_PORTABLE_DIR", "1");
+    } else {
+        // 模式切换后 relaunch() 会继承旧进程的环境变量。如果用户从便携模式
+        // 切回了系统默认模式，必须清除这两个变量，否则 sidecar 仍会读取旧目录。
+        std::env::remove_var("CLAUDE_CONFIG_DIR");
+        std::env::remove_var("CC_HAHA_APP_PORTABLE_DIR");
     }
 
     // If CLAUDE_CONFIG_DIR is set (either from env or from our startup logic above),
@@ -41,8 +46,12 @@ fn main() {
 /// Determine if we should start in portable mode.
 /// Returns the portable config directory path if yes, None for default mode.
 fn determine_startup_portable_dir() -> Option<PathBuf> {
-    // 1. 如果外部已经设置了 CLAUDE_CONFIG_DIR 环境变量，我们不应该覆盖它，直接返回 None 让 main 保持原样
-    if std::env::var("CLAUDE_CONFIG_DIR").is_ok() {
+    // 1. 只有当 CLAUDE_CONFIG_DIR 是真正从外部设置时（用户脚本/批处理等），才跳过。
+    //    如果 CC_HAHA_APP_PORTABLE_DIR 同时存在，说明是我们自己上次启动时设置的，
+    //    relaunch() 会继承这些变量，此时仍应检查 app-mode.json 以响应用户的模式切换。
+    if std::env::var("CLAUDE_CONFIG_DIR").is_ok()
+        && std::env::var("CC_HAHA_APP_PORTABLE_DIR").is_err()
+    {
         return None;
     }
 
