@@ -27,6 +27,7 @@ import { handleActivityStatsApi } from './api/activityStats.js'
 import { handleOpenTargetsApi } from './api/open-targets.js'
 import { handleMemoryApi } from './api/memory.js'
 import { handleDesktopUiApi } from './api/desktop-ui.js'
+import { handleAiyoLoginApi } from './api/aiyo-login.js'
 
 export async function handleApiRequest(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -79,6 +80,9 @@ export async function handleApiRequest(req: Request, url: URL): Promise<Response
 
     case 'haha-oauth':
       return handleHahaOAuthApi(req, url, segments)
+
+    case 'aiyo-login':
+      return handleAiyoLoginApi(req, url, segments)
 
     case 'haha-openai-oauth':
       return handleHahaOpenAIOAuthApi(req, url, segments)

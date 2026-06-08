@@ -3,6 +3,7 @@ import { Sidebar } from './Sidebar'
 import { ContentRouter } from './ContentRouter'
 import { ToastContainer } from '../shared/Toast'
 import { UpdateChecker } from '../shared/UpdateChecker'
+import { initializeAiyoLogin } from '../../stores/aiyoLoginStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useUIStore, type SettingsTab } from '../../stores/uiStore'
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
@@ -90,6 +91,8 @@ export function AppShell() {
           if (activeId && activeTab?.type === 'session') {
             useChatStore.getState().connectToSession(activeId)
           }
+          // Initialize AiYo login — verify API Key with xspace
+          initializeAiyoLogin().catch(() => {})
         })().catch(() => {})
       } catch (error) {
         if (!cancelled) {

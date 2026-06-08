@@ -811,6 +811,7 @@ export const zh: Record<TranslationKey, string> = {
 
   // Settings > Computer Use
   'settings.tab.computerUse': 'Computer Use',
+  'settings.tab.aiyoLogin': 'AiYo 登录',
   'settings.computerUse.title': 'Computer Use',
   'settings.computerUse.description': '允许 Claude 截屏、点击、打字并控制你的电脑。需要 Python 3，macOS 上还需要辅助功能权限。',
   'settings.computerUse.enabledToggle': '启用',
@@ -862,6 +863,18 @@ export const zh: Record<TranslationKey, string> = {
   'settings.computerUse.permRestartHint': '授权后需重启 App 才能生效。',
   'settings.computerUse.flagClipboard': '剪贴板访问',
   'settings.computerUse.flagSystemKeys': '系统快捷键',
+
+  // Settings > AiYo Login
+  'settings.aiyoLogin.title': 'AiYo 登录',
+  'settings.aiyoLogin.description': '配置 xspace API Key 用于 AiYo 身份验证。',
+  'settings.aiyoLogin.apiKeyLabel': 'xspace API Key',
+  'settings.aiyoLogin.apiKeyPlaceholder': 'xspace_ak_...',
+  'settings.aiyoLogin.apiKeyHint': '输入你的 xspace API Key 以启用 AiYo 身份功能。',
+  'settings.aiyoLogin.saveAndVerify': '保存并验证',
+  'settings.aiyoLogin.verifySuccess': '验证成功',
+  'settings.aiyoLogin.verifyFailed': '验证失败',
+  'settings.aiyoLogin.loggedInAs': '已登录为 {username}（{spaceId}）',
+  'settings.aiyoLogin.notLoggedIn': '未登录 — 请在上方输入 API Key',
 
   // Settings > General - Storage
   'settings.general.modeSwitchTitle': '切换数据存储位置？',

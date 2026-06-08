@@ -93,6 +93,7 @@ export type UserSettings = {
   }
   language?: string
   desktopTerminal?: Partial<DesktopTerminalSettings>
+  aiyoLoginApiKey?: string
   [key: string]: unknown
 }
 

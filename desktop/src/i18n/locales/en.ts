@@ -809,6 +809,7 @@ export const en = {
 
   // Settings > Computer Use
   'settings.tab.computerUse': 'Computer Use',
+  'settings.tab.aiyoLogin': 'AiYo Login',
   'settings.computerUse.title': 'Computer Use',
   'settings.computerUse.description': 'Allow Claude to take screenshots, click, type, and control your computer. Requires Python 3. On macOS, accessibility permissions are also needed.',
   'settings.computerUse.enabledToggle': 'Enabled',
@@ -860,6 +861,18 @@ export const en = {
   'settings.computerUse.permRestartHint': 'After granting, restart the app for it to take effect.',
   'settings.computerUse.flagClipboard': 'Clipboard Access',
   'settings.computerUse.flagSystemKeys': 'System Key Combos',
+
+  // Settings > AiYo Login
+  'settings.aiyoLogin.title': 'AiYo Login',
+  'settings.aiyoLogin.description': 'Configure the xspace API key for AiYo identity verification.',
+  'settings.aiyoLogin.apiKeyLabel': 'xspace API Key',
+  'settings.aiyoLogin.apiKeyPlaceholder': 'xspace_ak_...',
+  'settings.aiyoLogin.apiKeyHint': 'Enter your xspace API key to enable AiYo identity features.',
+  'settings.aiyoLogin.saveAndVerify': 'Save & Verify',
+  'settings.aiyoLogin.verifySuccess': 'Verification succeeded',
+  'settings.aiyoLogin.verifyFailed': 'Verification failed',
+  'settings.aiyoLogin.loggedInAs': 'Logged in as {username} ({spaceId})',
+  'settings.aiyoLogin.notLoggedIn': 'Not logged in — enter your API key above',
 
   // Settings > General - Storage
   'settings.general.modeSwitchTitle': 'Switch data storage location?',

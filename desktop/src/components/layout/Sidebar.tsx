@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Check, ChevronDown, Clock, Folder, FolderOpen, FolderPlus, GitBranch, LoaderCircle, MoreHorizontal, Pin, PinOff, RefreshCw, RotateCcw, SquarePen, X } from 'lucide-react'
+import { Check, ChevronDown, CircleUserRound, Clock, Folder, FolderOpen, FolderPlus, GitBranch, LoaderCircle, MoreHorizontal, Pin, PinOff, RefreshCw, RotateCcw, SquarePen, X } from 'lucide-react'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../i18n'
@@ -8,6 +8,7 @@ import type { SessionListItem } from '../../types/session'
 import { useTabStore, SETTINGS_TAB_ID, SCHEDULED_TAB_ID } from '../../stores/tabStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useOpenTargetStore } from '../../stores/openTargetStore'
+import { useAiyoLoginStore } from '../../stores/aiyoLoginStore'
 import { desktopUiPreferencesApi, type SidebarProjectPreferences } from '../../api/desktopUiPreferences'
 
 const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
@@ -63,6 +64,7 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
   const chatSessions = useChatStore((s) => s.sessions)
   const closeTab = useTabStore((s) => s.closeTab)
   const disconnectSession = useChatStore((s) => s.disconnectSession)
+  const { status: loginStatus } = useAiyoLoginStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null)
   const [projectContextMenu, setProjectContextMenu] = useState<{ key: string; x: number; y: number } | null>(null)
@@ -610,6 +612,16 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [filteredSessionIds, handleExitBatchMode, isBatchMode, selectSessions])
 
+  const isLoggedIn = loginStatus?.loggedIn === true
+  const identity = loginStatus?.loggedIn === true ? loginStatus.identity : null
+
+  const handleLogoClick = useCallback(() => {
+    if (isLoggedIn) return
+    // Open settings to aiyoLogin tab for configuring API key
+    useUIStore.getState().setPendingSettingsTab('aiyoLogin')
+    useTabStore.getState().openTab(SETTINGS_TAB_ID, 'Settings', 'settings')
+  }, [isLoggedIn])
+
   return (
     <aside
       onMouseDown={handleSidebarDrag}
@@ -619,13 +631,28 @@ export function Sidebar({ isMobile = false, onRequestClose }: SidebarProps) {
     >
       <div className={`px-3 pb-2 ${isTauri && !isWindows ? 'pt-[44px]' : 'pt-3'}`}>
         <div className={`flex ${expanded ? 'items-center justify-between gap-3' : 'flex-col items-center gap-2'}`}>
-          <div className={`flex min-w-0 items-center ${expanded ? 'gap-2.5' : 'justify-center'}`}>
-            <img src="/app-icon.png" alt="" className="h-8 w-8 flex-shrink-0" />
+          <div
+            className={`flex min-w-0 items-center ${expanded ? 'gap-2.5' : 'justify-center'} cursor-pointer`}
+            onClick={handleLogoClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleLogoClick() } }}
+            title={isLoggedIn && identity ? `Signed in as ${identity.username} (${identity.spaceId})` : 'Click to configure AiYo login'}
+          >
+            <div className="relative flex-shrink-0">
+              {isLoggedIn && identity ? (
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-indigo-500 text-white shadow-sm">
+                  <CircleUserRound className="h-6 w-6" />
+                </div>
+              ) : (
+                <img src="/app-icon.png" alt="" className="h-9 w-9 flex-shrink-0" />
+              )}
+            </div>
             <span
-              className={`sidebar-copy ${expanded ? 'sidebar-copy--visible' : 'sidebar-copy--hidden'} text-[13px] font-semibold tracking-tight text-[var(--color-text-primary)]`}
+              className={`sidebar-copy ${expanded ? 'sidebar-copy--visible' : 'sidebar-copy--hidden'} text-sm font-semibold tracking-tight text-[var(--color-text-primary)] truncate`}
               style={{ fontFamily: 'var(--font-headline)' }}
             >
-              AiYo
+              {isLoggedIn && identity ? identity.username : '未登录'}
             </span>
           </div>
           <div className={`flex items-center ${expanded ? 'gap-1.5' : 'flex-col gap-2'}`}>

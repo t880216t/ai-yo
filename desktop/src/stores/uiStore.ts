@@ -43,6 +43,7 @@ export type SettingsTab =
   | 'computerUse'
   | 'diagnostics'
   | 'about'
+  | 'aiyoLogin'
 
 type ActiveView = 'code' | 'scheduled' | 'terminal' | 'history' | 'settings'
 

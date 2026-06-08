@@ -31,6 +31,7 @@ import { DiagnosticsSettings } from './DiagnosticsSettings'
 import { ActivitySettings } from './ActivitySettings'
 import { MemorySettings } from './MemorySettings'
 import { useUIStore, type SettingsTab } from '../stores/uiStore'
+import { useAiyoLoginStore } from '../stores/aiyoLoginStore'
 import { ClaudeOfficialLogin } from '../components/settings/ClaudeOfficialLogin'
 import { ChatGPTOfficialLogin } from '../components/settings/ChatGPTOfficialLogin'
 import { OPENAI_OFFICIAL_PROVIDER_ID } from '../constants/openaiOfficialProvider'
@@ -164,6 +165,7 @@ export function Settings() {
             <TabButton icon="mouse" label={t('settings.tab.computerUse')} active={activeTab === 'computerUse'} onClick={() => setActiveTab('computerUse')} />
             <TabButton icon="monitoring" label={t('settings.tab.activity')} active={activeTab === 'activity'} onClick={() => setActiveTab('activity')} />
             <TabButton icon="monitor_heart" label={t('settings.tab.diagnostics')} active={activeTab === 'diagnostics'} onClick={() => setActiveTab('diagnostics')} />
+            <TabButton icon="login" label={t('settings.tab.aiyoLogin')} active={activeTab === 'aiyoLogin'} onClick={() => setActiveTab('aiyoLogin')} />
           </div>
           <div className="border-t border-[var(--color-border)]/40 pt-1">
             <TabButton icon="info" label={t('settings.tab.about')} active={activeTab === 'about'} onClick={() => setActiveTab('about')} />
@@ -186,6 +188,115 @@ export function Settings() {
           {activeTab === 'computerUse' && <ComputerUseSettings />}
           {activeTab === 'diagnostics' && <DiagnosticsSettings />}
           {activeTab === 'about' && <AboutSettings />}
+          {activeTab === 'aiyoLogin' && <AiyoLoginSettings />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AiyoLoginSettings() {
+  const { status, isLoading, saveAndVerify } = useAiyoLoginStore()
+  const t = useTranslation()
+  const [apiKey, setApiKey] = useState('')
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [verifyResult, setVerifyResult] = useState<'success' | 'failed' | null>(null)
+
+  const isLoggedIn = status?.loggedIn === true
+  const identity = status?.loggedIn === true ? status.identity : null
+
+  const handleSaveAndVerify = async () => {
+    if (!apiKey.trim()) return
+    setVerifyResult(null)
+    try {
+      const result = await saveAndVerify(apiKey.trim())
+      setVerifyResult(result.loggedIn ? 'success' : 'failed')
+    } catch {
+      setVerifyResult('failed')
+    }
+  }
+
+  return (
+    <div className="max-w-xl">
+      <h2 className="text-base font-semibold text-[var(--color-text-primary)] mb-1">
+        {t('settings.aiyoLogin.title')}
+      </h2>
+      <p className="text-sm text-[var(--color-text-tertiary)] mb-4">
+        {t('settings.aiyoLogin.description')}
+      </p>
+
+      {/* Status display */}
+      <div className={`mb-4 px-4 py-3 rounded-xl border ${
+        isLoggedIn
+          ? 'border-[var(--color-success)]/30 bg-[var(--color-success)]/5'
+          : 'border-[var(--color-border)] bg-[var(--color-surface-container-low)]'
+      }`}>
+        {isLoggedIn && identity ? (
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-[var(--color-success)] text-[20px]">check_circle</span>
+            <span className="text-sm text-[var(--color-text-primary)]">
+              {t('settings.aiyoLogin.loggedInAs', { username: identity.username, spaceId: identity.spaceId })}
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-[var(--color-text-tertiary)] text-[20px]">info</span>
+            <span className="text-sm text-[var(--color-text-secondary)]">
+              {t('settings.aiyoLogin.notLoggedIn')}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* API Key input */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-container-low)] px-4 py-4">
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <Input
+              id="aiyo-login-api-key"
+              type={showApiKey ? 'text' : 'password'}
+              label={t('settings.aiyoLogin.apiKeyLabel')}
+              value={apiKey}
+              placeholder={t('settings.aiyoLogin.apiKeyPlaceholder')}
+              autoComplete="off"
+              onChange={(e) => { setApiKey(e.target.value); setVerifyResult(null) }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowApiKey((visible) => !visible)}
+              aria-label={showApiKey ? 'Hide API Key' : 'Show API Key'}
+              className="absolute right-1.5 top-[30px] flex h-7 w-7 cursor-pointer items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)] focus:outline-none focus:shadow-[var(--shadow-focus-ring)]"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {showApiKey ? 'visibility_off' : 'visibility'}
+              </span>
+            </button>
+          </div>
+          {verifyResult && (
+            <div className={`flex items-center gap-2 text-xs ${
+              verifyResult === 'success' ? 'text-[var(--color-success)]' : 'text-[var(--color-error)]'
+            }`}>
+              <span className="material-symbols-outlined text-[14px]">
+                {verifyResult === 'success' ? 'check_circle' : 'error'}
+              </span>
+              {verifyResult === 'success' ? t('settings.aiyoLogin.verifySuccess') : t('settings.aiyoLogin.verifyFailed')}
+            </div>
+          )}
+        </div>
+        <div className="mt-4 flex flex-col gap-3">
+          <p className="text-xs text-[var(--color-text-tertiary)] leading-5">
+            {t('settings.aiyoLogin.apiKeyHint')}
+          </p>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              disabled={!apiKey.trim() || isLoading}
+              loading={isLoading}
+              onClick={handleSaveAndVerify}
+            >
+              {t('settings.aiyoLogin.saveAndVerify')}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
