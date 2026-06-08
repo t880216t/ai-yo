@@ -516,7 +516,7 @@ fn run_sidecar_cli(
 fn install_builtin_plugins(app: &AppHandle, app_root: &Path) {
     // Phase 1: Register all required marketplaces (deduplicated).
     let marketplaces: &[&str] = &[
-        "supertester-ai/supertester",
+        "https://git.vemic.com/MIC/mictest/supertester.git",
         "claude-office-skills/skills",
         "anthropics/claude-plugins-official",
     ];
