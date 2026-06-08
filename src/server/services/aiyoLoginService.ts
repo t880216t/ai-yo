@@ -23,7 +23,7 @@ export type AiyoLoginStatus =
 export class AiyoLoginService {
   private xspaceHost = '127.0.0.1'
   private xspacePort = 8000
-  private apiKey = 'xspace_ak_49d66ddc70ae9f7a962d4e3079de59e4'
+  private apiKey = ''
   private cachedIdentity: AiyoIdentity | null = null
 
   /** 更新运行时 API Key 并清除缓存身份 */
